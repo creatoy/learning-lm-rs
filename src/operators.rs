@@ -71,19 +71,48 @@ pub fn masked_softmax(y: &mut Tensor<f32>) {
 }
 
 pub fn rms_norm(y: &mut Tensor<f32>, x: &Tensor<f32>, w: &Tensor<f32>, epsilon: f32) {
-    todo!("实现 rms_norm，计算前做一些必要的检查会帮助你后续调试")
+    assert_eq!(y.shape(), x.shape());
+
+    let n = x.shape().last().unwrap().to_owned();
+    assert_eq!(&n, w.shape().last().unwrap());
+
+    let v_num = x.size() / n;
+
+    let y = unsafe { y.data_mut() };
+    let x = x.data();
+    let w = w.data();
+
+    for i in 0..v_num {
+        let x_i = &x[i * n..(i + 1) * n];
+        let sum = x_i.iter().fold(0.0, |acc, x| acc + x.powi(2));
+        let norm = (sum / n as f32).sqrt();
+
+        let scale = (norm + epsilon).recip();
+
+        y[i * n..(i + 1) * n]
+            .iter_mut()
+            .zip(x_i)
+            .zip(w)
+            .for_each(|((y, x), w)| *y = *x * w * scale);
+    }
+}
+
+fn sigmoid(x: f32) -> f32 {
+    (1.0 + (-x).exp()).recip()
 }
 
 // y = sigmoid(x) * x * y
 // hint: this is an element-wise operation
 pub fn silu(y: &mut Tensor<f32>, x: &Tensor<f32>) {
-    // let len = y.size();
-    // assert!(len == x.size());
+    let len = y.size();
+    assert!(len == x.size());
 
-    // let _y = unsafe { y.data_mut() };
-    // let _x = x.data();
+    let y = unsafe { y.data_mut() };
+    let x = x.data();
 
-    todo!("实现 silu，这里给了一些前期准备工作的提示，你可以参考")
+    y.iter_mut()
+        .zip(x)
+        .for_each(|(y, x)| *y = *y * sigmoid(*x) * x);
 }
 
 // C = beta * C + alpha * A @ B^T
